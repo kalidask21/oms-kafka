@@ -1,0 +1,36 @@
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        enable.idempotence: true        # no duplicates / no reordering on retry
+        compression.type: zstd
+        linger.ms: 10                    # small wait to batch for throughput
+        spring.json.add.type.headers: false   # rely on @JsonTypeInfo in the body
+
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false          # Spring commits after successful processing
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+
+    streams:
+      application-id: oms-streams
+      properties:
+        processing.guarantee: exactly_once_v2
+        commit.interval.ms: 1000
+        num.stream.threads: 1
+        replication.factor: 1            # internal/changelog topics (single broker)
+        default.key.serde: org.apache.kafka.common.serialization.Serdes$StringSerde
+        state.dir: ${java.io.tmpdir}/kafka-streams-oms
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.example.oms: INFO
