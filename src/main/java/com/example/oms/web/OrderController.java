@@ -60,7 +60,7 @@ public class OrderController {
     }
 
     /** All orders from H2 rendered as an HTML table, newest first by createdAt.
-     *  Optional ?search= filters by order ID (prefix) or item name (contains, case-insensitive). */
+     *  Optional ?search= filters by order ID or item name (contains, case-insensitive). */
     @GetMapping(value = "/export", produces = MediaType.TEXT_HTML_VALUE)
     public String export(@RequestParam(required = false, defaultValue = "") String search) {
         List<OrderDetail> all = repo.findAll();
@@ -75,11 +75,48 @@ public class OrderController {
         String safeQ = esc(search);
         StringBuilder sb = new StringBuilder("""
                 <!doctype html><html lang="en"><head><meta charset="UTF-8">
-                <title>OMS Orders</title>
+                <title>OMS Service</title>
                 <style>
                   * { box-sizing: border-box; margin: 0; padding: 0; }
                   body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
-                  h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 16px; color: #f8fafc; }
+                  h1 { font-size: 1.5rem; font-weight: 700; color: #f8fafc; }
+                  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+                  /* Place Order button */
+                  .btn-order { background: #10b981; border: none; border-radius: 7px; color: #fff;
+                               padding: 8px 18px; font-size: .85rem; font-weight: 600; cursor: pointer; }
+                  .btn-order:hover { background: #059669; }
+                  /* Order form panel */
+                  .order-panel { background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+                                 padding: 20px 24px; margin-bottom: 22px; display: none; }
+                  .order-panel.open { display: block; }
+                  .order-panel h2 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; color: #f1f5f9; }
+                  .form-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+                  .form-row label { font-size: .78rem; color: #94a3b8; width: 110px; flex-shrink: 0; }
+                  .form-row input { background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+                                    color: #e2e8f0; padding: 6px 10px; font-size: .82rem; outline: none; }
+                  .form-row input:focus { border-color: #3b82f6; }
+                  .inp-cust { width: 200px; }
+                  .inp-sku  { width: 160px; }
+                  .inp-num  { width: 80px; }
+                  .items-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+                  .items-table th { font-size: .72rem; color: #64748b; text-transform: uppercase;
+                                    letter-spacing: .04em; padding: 4px 8px; text-align: left; }
+                  .items-table td { padding: 5px 8px; }
+                  .items-table input { background: #0f172a; border: 1px solid #334155; border-radius: 5px;
+                                       color: #e2e8f0; padding: 5px 8px; font-size: .8rem; width: 100%; outline: none; }
+                  .items-table input:focus { border-color: #3b82f6; }
+                  .btn-sm { background: #334155; border: none; border-radius: 5px; color: #e2e8f0;
+                            padding: 4px 10px; font-size: .75rem; cursor: pointer; }
+                  .btn-sm:hover { background: #475569; }
+                  .btn-primary { background: #3b82f6; border: none; border-radius: 6px; color: #fff;
+                                 padding: 7px 16px; font-size: .82rem; cursor: pointer; font-weight: 600; }
+                  .btn-primary:hover { background: #2563eb; }
+                  .note { background: #451a03; border: 1px solid #92400e; border-radius: 6px;
+                          color: #fcd34d; font-size: .76rem; padding: 8px 12px; margin: 12px 0; }
+                  .note b { color: #fbbf24; }
+                  .result-ok  { color: #34d399; font-size: .82rem; margin-top: 10px; }
+                  .result-err { color: #f87171; font-size: .82rem; margin-top: 10px; }
+                  /* Search toolbar */
                   .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
                   .toolbar form { display: flex; gap: 8px; }
                   .toolbar input { background: #1e293b; border: 1px solid #334155; border-radius: 6px;
@@ -91,14 +128,15 @@ public class OrderController {
                   .clear { font-size: .78rem; color: #94a3b8; text-decoration: none; }
                   .clear:hover { color: #e2e8f0; }
                   .meta { font-size: .8rem; color: #94a3b8; margin-bottom: 16px; }
+                  /* Table */
                   .wrap { overflow-x: auto; border-radius: 10px; border: 1px solid #1e293b; }
-                  table { width: 100%; border-collapse: collapse; font-size: .78rem; }
-                  thead tr { background: #1e293b; }
-                  th { padding: 10px 14px; text-align: left; color: #94a3b8; font-weight: 600;
+                  table.orders { width: 100%; border-collapse: collapse; font-size: .78rem; }
+                  table.orders thead tr { background: #1e293b; }
+                  table.orders th { padding: 10px 14px; text-align: left; color: #94a3b8; font-weight: 600;
                        text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
-                  tbody tr { border-top: 1px solid #1e293b; }
-                  tbody tr:hover { background: #1e293b88; }
-                  td { padding: 9px 14px; vertical-align: middle; white-space: nowrap; }
+                  table.orders tbody tr { border-top: 1px solid #1e293b; }
+                  table.orders tbody tr:hover { background: #1e293b88; }
+                  table.orders td { padding: 9px 14px; vertical-align: middle; white-space: nowrap; }
                   .badge { display: inline-block; padding: 2px 10px; border-radius: 999px;
                            font-size: .7rem; font-weight: 700; color: #fff; }
                   .dash { color: #475569; }
@@ -108,10 +146,91 @@ public class OrderController {
                   .hl { background: #854d0e; border-radius: 2px; padding: 0 2px; }
                   .empty { padding: 40px; text-align: center; color: #475569; }
                 </style></head><body>
-                <h1>Order Management — H2 Snapshot</h1>
                 """);
 
-        // search bar
+        // ── Header ──────────────────────────────────────────────────────
+        sb.append("""
+                <div class="header">
+                  <h1>OMS Service</h1>
+                  <button class="btn-order" onclick="document.getElementById('panel').classList.toggle('open')">
+                    + Place Order
+                  </button>
+                </div>
+                """);
+
+        // ── Place Order panel ────────────────────────────────────────────
+        sb.append("""
+                <div class="order-panel" id="panel">
+                  <h2>New Order</h2>
+                  <div class="form-row">
+                    <label>Customer Name</label>
+                    <input id="custId" class="inp-cust" placeholder="e.g. CUST-001">
+                  </div>
+                  <table class="items-table">
+                    <thead><tr>
+                      <th>SKU</th><th>Qty</th><th>Unit Price ($)</th><th></th>
+                    </tr></thead>
+                    <tbody id="itemRows">
+                      <tr>
+                        <td><input class="sku" placeholder="e.g. SHOE-001"></td>
+                        <td><input class="qty inp-num" type="number" min="1" value="1"></td>
+                        <td><input class="price inp-num" type="number" min="0.01" step="0.01" placeholder="99.99"></td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+                    <button class="btn-sm" onclick="addItem()">+ Add Item</button>
+                    <button class="btn-primary" onclick="submitOrder()">Submit Order</button>
+                  </div>
+                  <div class="note">
+                    ⚠️ <b>Payment failure rule:</b> orders with a total value <b>≥&nbsp;$10,000</b>
+                    are declined by PaymentService — the order will be set to <b>CANCELLED</b>.
+                    Keep the sum of (unit price × qty) across all items below $10,000 to reach SHIPPED status.
+                  </div>
+                  <div id="orderResult"></div>
+                </div>
+                <script>
+                function addItem() {
+                  const tbody = document.getElementById('itemRows');
+                  const tr = document.createElement('tr');
+                  tr.innerHTML = `
+                    <td><input class="sku" placeholder="e.g. SHIRT-002"></td>
+                    <td><input class="qty inp-num" type="number" min="1" value="1"></td>
+                    <td><input class="price inp-num" type="number" min="0.01" step="0.01" placeholder="49.99"></td>
+                    <td><button class="btn-sm" onclick="this.closest('tr').remove()">✕</button></td>`;
+                  tbody.appendChild(tr);
+                }
+                async function submitOrder() {
+                  const customerId = document.getElementById('custId').value.trim();
+                  if (!customerId) { alert('Customer Name is required'); return; }
+                  const skus   = [...document.querySelectorAll('.sku')];
+                  const qtys   = [...document.querySelectorAll('.qty')];
+                  const prices = [...document.querySelectorAll('.price')];
+                  const items  = skus.map((s,i) => ({
+                    sku: s.value.trim(),
+                    qty: parseInt(qtys[i].value) || 1,
+                    unitPriceCents: Math.round((parseFloat(prices[i].value) || 0) * 100)
+                  })).filter(it => it.sku);
+                  if (!items.length) { alert('Add at least one item with a SKU'); return; }
+                  const res = document.getElementById('orderResult');
+                  try {
+                    const r = await fetch('/orders', {
+                      method:'POST',
+                      headers:{'Content-Type':'application/json'},
+                      body: JSON.stringify({customerId, items})
+                    });
+                    const d = await r.json();
+                    res.innerHTML = `<p class="result-ok">✓ Order placed — ID: <b>${d.orderId}</b>. Refreshing…</p>`;
+                    setTimeout(() => location.reload(), 2500);
+                  } catch(e) {
+                    res.innerHTML = `<p class="result-err">✗ ${e.message}</p>`;
+                  }
+                }
+                </script>
+                """);
+
+        // ── Search bar ───────────────────────────────────────────────────
         sb.append("<div class='toolbar'><form method='get' action='/orders/export'>")
           .append("<input name='search' placeholder='Search by order ID or item name…' value='").append(safeQ).append("'>")
           .append("<button type='submit'>Search</button></form>");
@@ -124,7 +243,8 @@ public class OrderController {
           .append(" orders").append(q.isEmpty() ? "" : " matching <b>" + safeQ + "</b>")
           .append(" &nbsp;·&nbsp; newest first</p>");
 
-        sb.append("<div class='wrap'><table><thead><tr>");
+        // ── Orders table ─────────────────────────────────────────────────
+        sb.append("<div class='wrap'><table class='orders'><thead><tr>");
         for (String h : new String[]{"#","Order ID","Customer","Status","Total ($)","Items","Created",
                                      "order.events","inventory.commands","payments.commands","Updated"}) {
             sb.append("<th>").append(h).append("</th>");

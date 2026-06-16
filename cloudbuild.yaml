@@ -1,0 +1,58 @@
+steps:
+  # 1 — Build the JAR
+  - id: build-jar
+    name: maven:3.9-eclipse-temurin-21
+    entrypoint: mvn
+    args: [package, -DskipTests, -q]
+
+  # 2 — Build Docker image
+  - id: build-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/oms-kafka:${SHORT_SHA}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/oms-kafka:latest
+      - .
+    waitFor: [build-jar]
+
+  # 3 — Push to Artifact Registry
+  - id: push-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/oms-kafka
+    waitFor: [build-image]
+
+  # 4 — Apply k8s manifests (first deploy: kafka + configmap)
+  - id: apply-infra
+    name: gcr.io/cloud-builders/kubectl
+    args: [apply, -f, gcp/k8s/]
+    env:
+      - CLOUDSDK_COMPUTE_REGION=${_REGION}
+      - CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER}
+    waitFor: [push-image]
+
+  # 5 — Roll out the new app image
+  - id: rollout
+    name: gcr.io/cloud-builders/kubectl
+    args:
+      - set image
+      - deployment/oms-app
+      - oms-app=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/oms-kafka:${SHORT_SHA}
+      - -n
+      - oms
+    env:
+      - CLOUDSDK_COMPUTE_REGION=${_REGION}
+      - CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER}
+    waitFor: [apply-infra]
+
+substitutions:
+  _REGION: us-central1
+  _REPO: oms-kafka
+  _CLUSTER: oms-cluster
+
+options:
+  logging: CLOUD_LOGGING_ONLY

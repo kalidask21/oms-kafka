@@ -1,0 +1,8 @@
+spring:
+  kafka:
+    # Overridden by SPRING_KAFKA_BOOTSTRAP_SERVERS env var from ConfigMap.
+    # Fallback to in-cluster kafka service name.
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+  h2:
+    console:
+      enabled: false   # disable in production — no public exposure of /h2-console
