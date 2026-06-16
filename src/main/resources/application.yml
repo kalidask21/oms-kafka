@@ -28,7 +28,6 @@ spring:
         default.key.serde: org.apache.kafka.common.serialization.Serdes$StringSerde
         state.dir: ${java.io.tmpdir}/kafka-streams-oms
 
-spring:
   datasource:
     url: jdbc:h2:mem:omsdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
